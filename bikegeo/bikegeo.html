@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+
+<style type="text/css">
+	h4 {font-family: sans-serif;}
+	p {font-family: sans-serif;}
+	a {font-family: sans-serif; color:#d15423; text-decoration:none;}
+</style>
+ 
+
+<title>Bike Geo from Image</title>
+
+<script src="../Modernizr/modernizr-2.0.6.js"></script>
+
+<script type="text/javascript">
+
+//JavaScript HTML5 Canvas example by Dan Gries, rectangleworld.com.
+//The basic setup here, including the debugging code and window load listener, is copied from 'HTML5 Canvas' by Fulton & Fulton.
+//Checking for browser compatibility is accomplished with the Modernizr JavaScript library.
+//The latest version of the library is available at www.modernizr.com.
+
+//The code below establishes a way to send debug messages to the browser JavaScript Console, 
+//but in such a way as to ignore errors when the browser doesn't support the JavaScript Console.
+//To log a messages to the console within this code, insert into the code:
+//Debugger.log("my message");
+window.addEventListener("load", windowLoadHandler, false);
+var Debugger = function() { };
+Debugger.log = function(message) {
+	try {
+		console.log(message);
+	}
+	catch (exception) {
+		return;
+	}
+}
+
+function windowLoadHandler() {
+	canvasApp();
+}
+
+function canvasSupport() {
+	return Modernizr.canvas;
+}
+
+function canvasApp() {
+	if (!canvasSupport()) {
+		return;
+	}
+	
+	var theCanvas = document.getElementById("canvasOne");
+	var context = theCanvas.getContext("2d");
+	
+	init();
+	
+	//var numShapes;
+	var shapes;
+	var dragIndex;
+	var dragging;
+	var mouseX;
+	var mouseY;
+	var dragHoldX;
+	var dragHoldY;
+
+	var crossSize;
+	var geometry;
+	
+	function init() {
+		//numShapes = 6;
+		crossSize=5;
+		shapes = [];
+		geometry=[];
+		
+		makeShapes();
+		
+		drawScreen();
+		
+		theCanvas.addEventListener("mousedown", mouseDownListener, false);
+	}
+	
+	function makeShapes() {
+
+		//headTop
+		shapes["headTop"]=({index:5,x:422, y:97,  color:"rgb(255,0,0)", name:"headTop"});
+		//headDown
+		shapes["headDown"]=({index:6,x:423, y:126,  color:"rgb(0,255,0)", name:"headDown"});
+		//topSeat
+		shapes["topSeat"]=({index:7,x:242, y:98,  color:"rgb(0,0,255)", name:"topSeat"});
+		//BB
+		shapes["BB"]=({index:8,x:254, y:210,  color:"rgb(100,100,0)", name:"BB"});
+		//rearAxle
+		shapes["rearAxle"]=({index:9,x:153, y:212,  color:"rgb(100,100,100)", name:"rearAxle"});
+		//frontAxle
+		shapes["frontAxle"]=({index:10,x:458, y:212,  color:"rgb(0,150,150)", name:"frontAxle"});
+
+		//scaling bar 
+		shapes["scalingA"]=({index:11,x:137, y:87,  color:"rgb(00,0,200)", name:"scalingA"});
+		shapes["scalingB"]=({index:12,x:163, y:87,  color:"rgb(200,0,0)", name:"scalingB"});
+
+	}
+	
+	function mouseDownListener(evt) {
+		var i;
+		//We are going to pay attention to the layering order of the objects so that if a mouse down occurs over more than object,
+		//only the topmost one will be dragged.
+		var highestIndex = -1;
+		
+		//getting mouse position correctly, being mindful of resizing that may have occured in the browser:
+		var bRect = theCanvas.getBoundingClientRect();
+		mouseX = (evt.clientX - bRect.left)*(theCanvas.width/bRect.width);
+		mouseY = (evt.clientY - bRect.top)*(theCanvas.height/bRect.height);
+				
+		//find which shape was clicked
+		for (var i in shapes) {
+    		// skip loop if the property is from prototype
+    		if (!shapes.hasOwnProperty(i)) continue;
+
+			if	(hitTest(shapes[i], mouseX, mouseY)) {
+				dragging = true;
+				//console.log("dragging");
+				if (shapes[i].index > highestIndex) {
+					//We will pay attention to the point on the object where the mouse is "holding" the object:
+					dragHoldX = mouseX - shapes[i].x;
+					dragHoldY = mouseY - shapes[i].y;
+					highestIndex = shapes[i].index ;
+					dragIndex = i ;
+				}
+			}
+		}
+		
+		if (dragging) {
+			window.addEventListener("mousemove", mouseMoveListener, false);
+		}
+		theCanvas.removeEventListener("mousedown", mouseDownListener, false);
+		window.addEventListener("mouseup", mouseUpListener, false);
+		
+		//code below prevents the mouse down from having an effect on the main browser window:
+		if (evt.preventDefault) {
+			evt.preventDefault();
+		} //standard
+		else if (evt.returnValue) {
+			evt.returnValue = false;
+		} //older IE
+		return false;
+	}
+	
+	function mouseUpListener(evt) {
+		theCanvas.addEventListener("mousedown", mouseDownListener, false);
+		window.removeEventListener("mouseup", mouseUpListener, false);
+		if (dragging) {
+			dragging = false;
+			window.removeEventListener("mousemove", mouseMoveListener, false);
+		}
+	}
+
+	function mouseMoveListener(evt) {
+		var posX;
+		var posY;
+		//var shapeRad = shapes[dragIndex].rad;
+		var minX = crossSize;
+		var maxX = theCanvas.width - crossSize;
+		var minY = crossSize;
+		var maxY = theCanvas.height - crossSize;
+		//getting mouse position correctly 
+		var bRect = theCanvas.getBoundingClientRect();
+		mouseX = (evt.clientX - bRect.left)*(theCanvas.width/bRect.width);
+		mouseY = (evt.clientY - bRect.top)*(theCanvas.height/bRect.height);
+		
+		//clamp x and y positions to prevent object from dragging outside of canvas
+		posX = mouseX - dragHoldX;
+		posX = (posX < minX) ? minX : ((posX > maxX) ? maxX : posX);
+		posY = mouseY - dragHoldY;
+		posY = (posY < minY) ? minY : ((posY > maxY) ? maxY : posY);
+		
+		shapes[dragIndex].x = posX;
+		shapes[dragIndex].y = posY;
+		/*console.log("cross moved");
+		console.log(shapes[dragIndex].name);
+		console.log(shapes[dragIndex].x);
+		console.log(shapes[dragIndex].y);*/
+
+		
+		drawScreen();
+	}
+	
+	function hitTest(shape,mx,my) {
+		
+		var dx;
+		var dy;
+		dx = mx - shape.x;
+		dy = my - shape.y;
+		
+		//a "hit" will be registered if the distance away from the center is less than the radius of the circular object		
+		//return (dx*dx + dy*dy < shape.rad*shape.rad);
+
+		//a "hit" will be registered if the distance away from the center is less than the radius of the cross		
+		return (dx*dx + dy*dy < crossSize*crossSize);
+	}
+	
+	function drawShapes() {
+		var i;
+		var x;
+		var y;
+		for (var i in shapes) {
+    		// skip loop if the property is from prototype
+    		if (!shapes.hasOwnProperty(i)) continue;
+
+			x= shapes[i].x;
+			y=shapes[i].y;
+			context.strokeStyle = shapes[i].color;
+			context.beginPath();
+    		context.moveTo(x+crossSize, y+crossSize);
+    		context.lineTo(x-crossSize, y-crossSize);
+    		context.moveTo(x-crossSize, y+crossSize);
+    		context.lineTo(x+crossSize, y-crossSize);
+    		context.stroke();
+    	}
+
+
+		//top tube
+		context.strokeStyle = "rgb(255,0,0)";
+		context.beginPath();
+		context.moveTo(shapes["headTop"].x,shapes["headTop"].y);
+		context.lineTo(shapes["topSeat"].x,shapes["topSeat"].y);
+		//seat tube
+		context.lineTo(shapes["BB"].x,shapes["BB"].y);
+		//down tube
+		context.lineTo(shapes["headDown"].x,shapes["headDown"].y);
+		//headtube
+		context.closePath();
+		//seatstay
+		context.moveTo(shapes["topSeat"].x,shapes["topSeat"].y);
+		context.lineTo(shapes["rearAxle"].x,shapes["rearAxle"].y);
+		//chainstay
+		context.lineTo(shapes["BB"].x,shapes["BB"].y);
+		//fork
+		context.moveTo(shapes["headDown"].x,shapes["headDown"].y);
+		context.lineTo(shapes["frontAxle"].x,shapes["frontAxle"].y);
+		context.stroke();
+
+
+		//scaling bar
+		context.strokeStyle = "rgb(0,0,255)";
+		context.beginPath();
+		context.moveTo(shapes["scalingA"].x,shapes["scalingA"].y);
+		context.lineTo(shapes["scalingB"].x,shapes["scalingB"].y);
+		context.stroke();
+
+		//ETT crosses seattube
+		context.strokeStyle = shapes["seatTubeETT"].color;
+		context.beginPath();
+		context.moveTo(shapes["seatTubeETT"].x+crossSize, shapes["seatTubeETT"].y+crossSize);
+		context.lineTo(shapes["seatTubeETT"].x-crossSize, shapes["seatTubeETT"].y-crossSize);
+		context.moveTo(shapes["seatTubeETT"].x-crossSize, shapes["seatTubeETT"].y+crossSize);
+		context.lineTo(shapes["seatTubeETT"].x+crossSize, shapes["seatTubeETT"].y-crossSize);
+		context.stroke();
+
+
+	}
+
+	function calculateDistance(x1,y1,x2,y2){
+		//calculate distance between two points
+		var a = x1 - x2
+		var b = y1 - y2
+		return Math.sqrt( a*a + b*b );
+
+	}
+
+	function calculateAngle(xT,yT,xB,yB){
+		//calculate head angle, seat angle
+		var opposite = yT - yB;
+		var adjacent = xT - xB;
+		return (Math.atan(opposite/adjacent) ) * (180 / Math.PI);
+
+	}
+
+
+	//http://jsfiddle.net/justin_c_rounds/Gd2S2/
+	function checkLineIntersection(line1StartX, line1StartY, line1EndX, line1EndY, line2StartX, line2StartY, line2EndX, line2EndY) {
+    	// if the lines intersect, the result contains the x and y of the intersection (treating the lines as infinite) and booleans for whether line segment 1 or line segment 2 contain the point
+	    var denominator, a, b, numerator1, numerator2, result = {
+	        x: null,
+	        y: null,
+	        onLine1: false,
+	        onLine2: false
+	    };
+	    denominator = ((line2EndY - line2StartY) * (line1EndX - line1StartX)) - ((line2EndX - line2StartX) * (line1EndY - line1StartY));
+	    if (denominator == 0) {
+	        return result;
+	    }
+	    a = line1StartY - line2StartY;
+	    b = line1StartX - line2StartX;
+	    numerator1 = ((line2EndX - line2StartX) * a) - ((line2EndY - line2StartY) * b);
+	    numerator2 = ((line1EndX - line1StartX) * a) - ((line1EndY - line1StartY) * b);
+	    a = numerator1 / denominator;
+	    b = numerator2 / denominator;
+
+	    // if we cast these lines infinitely in both directions, they intersect here:
+	    result.x = line1StartX + (a * (line1EndX - line1StartX));
+	    result.y = line1StartY + (a * (line1EndY - line1StartY));
+	/*
+	        // it is worth noting that this should be the same as:
+	        x = line2StartX + (b * (line2EndX - line2StartX));
+	        y = line2StartX + (b * (line2EndY - line2StartY));
+	        */
+	    // if line1 is a segment and line2 is infinite, they intersect if:
+	    if (a > 0 && a < 1) {
+	        result.onLine1 = true;
+	    }
+	    // if line2 is a segment and line1 is infinite, they intersect if:
+	    if (b > 0 && b < 1) {
+	        result.onLine2 = true;
+	    }
+	    // if line1 and line2 are segments, they intersect if both of the above are true
+	    return result;
+	};
+
+	function calculateETT(){
+
+		var res = checkLineIntersection(shapes["headTop"].x,shapes["headTop"].y, 0, shapes["headTop"].y, 
+			shapes["topSeat"].x,shapes["topSeat"].y,shapes["BB"].x,shapes["BB"].y);		
+		//add to shapes list
+		shapes["seatTubeETT"]=({index:0,x:res.x, y:res.y,  color:"rgb(0,255,0)", name:"seatTubeETT"});
+		
+		return calculateDistance(shapes["headTop"].x,shapes["headTop"].y,res.x,res.y);
+
+		
+
+	}
+
+	function calculateBBDrop(){
+		var res = checkLineIntersection(shapes["BB"].x,shapes["BB"].y, shapes["BB"].x, 0, 
+			shapes["frontAxle"].x,shapes["frontAxle"].y,shapes["rearAxle"].x,shapes["rearAxle"].y);		
+		//add to shapes list
+		shapes["BBDrop"]=({index:1,x:res.x, y:res.y,  color:"rgb(0,255,0)", name:"BBDrop"});
+		
+		return calculateDistance(shapes["BB"].x,shapes["BB"].y,res.x,res.y);
+
+
+	}
+
+
+	//functions for shortest distance to line
+	//http://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment
+	function sqr(x) { return x * x }
+	function dist2(v, w) { return sqr(v.x - w.x) + sqr(v.y - w.y) }
+	function distToSegmentSquared(p, v, w) {
+	  var l2 = dist2(v, w);
+	  if (l2 == 0) return dist2(p, v);
+	  var t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+	  if (t < 0) return dist2(p, v);
+	  if (t > 1) return dist2(p, w);
+	  return dist2(p, { x: v.x + t * (w.x - v.x),
+	                    y: v.y + t * (w.y - v.y) });
+	}
+	function distToSegment(p, v, w) { return Math.sqrt(distToSegmentSquared(p, v, w)); }
+
+
+	function pointAtX(a, b, x) {
+	  var slope = (b[1] - a[1]) / (b[0] - a[0])
+	  var y = a[1] + (x - a[0]) * slope
+	  return [x, y]
+	}
+	function pointAtY(a, b, y) {
+		console.log(b);
+	  var slope = (b[1] - a[1]) / (b[0] - a[0])
+	  //var y = a.y + (x - a.x) * slope 
+	  var   x = a[0]+(y-a[1])/slope 
+	  //return [x, y]
+	  return {x:x,y:y}
+	}
+
+	function calculateForkOffset(){
+
+		var intY = pointAtY([shapes["headTop"].x,shapes["headTop"].y],[shapes["headDown"].x,shapes["headDown"].y],theCanvas.height);
+		
+		var offset = distToSegment( shapes["frontAxle"] , shapes["headDown"] , intY);
+
+
+/*
+		context.strokeStyle = "rgb(0,255,0)";
+		context.beginPath();
+		context.moveTo(shapes["headDown"].x,shapes["headDown"].y);
+		context.lineTo(intY.x,intY.y);
+
+		context.stroke();
+*/
+		return offset;
+
+	}
+
+
+
+	function calculateGeometry(){
+		var scaling=700; //(length of a crank)
+
+		var scalingLength = calculateDistance(shapes["scalingB"].x,shapes["scalingB"].y,shapes["scalingA"].x,shapes["scalingA"].y);
+
+		var scale = scaling / scalingLength;
+
+		//need to rotate every point so wheelbase is level......
+		//or just modify angles to suit? calculate angle of wheelbase, then add onto other angles? and effective TT
+
+		//top tube length
+		geometry["Top Tube (C-C)"]=	scale* calculateDistance(shapes["topSeat"].x,shapes["topSeat"].y,shapes["headTop"].x,shapes["headTop"].y);
+		//seat tube length
+		geometry["Seat Tube (C-C)"]=	scale* calculateDistance(shapes["topSeat"].x,shapes["topSeat"].y,shapes["BB"].x,shapes["BB"].y);
+
+		geometry["Chainstay (C-C)"]=	scale* calculateDistance(shapes["BB"].x,shapes["BB"].y,shapes["rearAxle"].x,shapes["rearAxle"].y);
+
+		geometry["Head Tube (C-C)"]=	scale* calculateDistance(shapes["headDown"].x,shapes["headDown"].y,shapes["headTop"].x,shapes["headTop"].y);
+
+		geometry["Front Centre"]=	scale* calculateDistance(shapes["BB"].x,shapes["BB"].y,shapes["frontAxle"].x,shapes["frontAxle"].y);
+
+		geometry["Wheelbase"]=	scale* calculateDistance(shapes["frontAxle"].x,shapes["frontAxle"].y,shapes["rearAxle"].x,shapes["rearAxle"].y);
+
+		geometry["Frame Stack"]=	scale* calculateDistance(shapes["BB"].x,shapes["BB"].y,shapes["BB"].x,shapes["headTop"].y);
+
+		geometry["Frame Reach"]=	scale* calculateDistance(shapes["BB"].x,shapes["headTop"].y,shapes["headTop"].x,shapes["headTop"].y);
+
+		geometry["Fork Length (to centre of DT)"]= scale* 
+			calculateDistance(shapes["frontAxle"].x,shapes["frontAxle"].y,shapes["headDown"].x,shapes["headDown"].y);
+
+
+
+
+		//head angle
+		geometry["head angle"]=calculateAngle(shapes["headTop"].x,shapes["headTop"].y,shapes["headDown"].x,shapes["headDown"].y);
+		//seat angle
+		geometry["seat angle"]=calculateAngle(shapes["topSeat"].x,shapes["topSeat"].y,shapes["BB"].x,shapes["BB"].y);
+		//ETT
+		geometry["Effective Top Tube"]=scale*  calculateETT();
+
+
+		//BB Drop
+		geometry["BB Drop"]=scale* calculateBBDrop();
+		//fork offset
+		geometry["Fork Offset (Rake)"]=scale* calculateForkOffset();
+
+
+
+		console.log(geometry);
+		
+
+	}
+	
+	function drawScreen() {
+		//bg
+		//context.fillStyle = "#ffffff";
+		context.clearRect(0,0,theCanvas.width,theCanvas.height);
+		calculateGeometry();
+		drawShapes();		
+		
+	}
+	
+}
+
+</script>
+
+</head>
+<body>
+<div style="top: 50px; text-align:center">
+<h4>Bike Geometry from image</h4>
+<canvas id="canvasOne" width="500" height="300" style="background: url('wolf.jpg');background-size: 100% ;
+    background-repeat: no-repeat;">
+Your browser does not support HTML5 canvas.
+</canvas>
+<p>could provide a button to rotate image slightly....?
+<p><b>wheelbase needs to be level....or calculate weheelbase anlge and modify other angles and ETT</b></p>
+<p>Load an image of a bike into background. <br/>Set the scaling bar (blue) to a known length and enter that length below. <br />Then drag the crosses to the appropriate locations on the bike, geo is reflected below</p>
+<p></p>
+</div>
+</body>
+</html>
